@@ -1,0 +1,131 @@
+{
+  "tool": "WASP command table",
+  "version": 2,
+  "source_export": "wasp-gestures-20261122-1513.json",
+  "frame_format": "Each command is sent as two bytes: [code, code XOR 0xFF]. The drone rejects any frame where the second byte is not the inverse of the first. Heartbeat (0x01) is sent at 10 Hz; if the drone hears none for 0.5 s it lands itself.",
+  "rules": [
+    "A command is only sent if the smoothed match is for that gesture AND its confidence is at or above that command's min_confidence for the whole hold time.",
+    "Body gestures override hand gestures. KILL overrides everything.",
+    "NUDGE_FWD, NUDGE_BACK, YAW_360, FOLLOW_ON, FOLLOW_OFF and HOVER_LOW are ignored unless the drone is airborne.",
+    "Keyboard kill and the heartbeat failsafe work independently of gestures."
+  ],
+  "code_groups": {
+    "0x0_": "link and heartbeat",
+    "0x1_": "flight state (takeoff, land)",
+    "0x2_": "altitude",
+    "0x3_": "movement nudges",
+    "0x4_": "manoeuvres",
+    "0x5_": "follow mode",
+    "0xE0": "KILL (motors off immediately)"
+  },
+  "commands": [
+    {
+      "gesture_id": "gmwryysusayg",
+      "gesture": "Kill",
+      "mode": "body",
+      "code": "0xE0",
+      "command": "KILL",
+      "hold_ms": 300,
+      "min_confidence": 0.40,
+      "action": "Cut motor power immediately, no controlled descent.",
+      "always_armed": true,
+      "phase": 1
+    },
+    {
+      "gesture_id": "gmwryzg6tnq8",
+      "gesture": "Take off",
+      "mode": "hand",
+      "code": "0x10",
+      "command": "TAKEOFF",
+      "hold_ms": 800,
+      "min_confidence": 0.70,
+      "action": "Spin up and climb to 0.5 m, then hold.",
+      "params": {"target_alt_m": 0.5},
+      "phase": 1
+    },
+    {
+      "gesture_id": "gmwrz07yeotl",
+      "gesture": "Land",
+      "mode": "hand",
+      "code": "0x11",
+      "command": "LAND",
+      "hold_ms": 500,
+      "min_confidence": 0.60,
+      "action": "Descend using the laser height reading, slow down near the floor, cut motors on touchdown.",
+      "phase": 1
+    },
+    {
+      "gesture_id": "gmwrz3v0757k",
+      "gesture": "Hover 10cm",
+      "mode": "body",
+      "code": "0x20",
+      "command": "HOVER_LOW",
+      "hold_ms": 500,
+      "min_confidence": 0.60,
+      "action": "Go to 0.10 m above the floor and hold.",
+      "params": {"target_alt_m": 0.10},
+      "phase": 1
+    },
+    {
+      "gesture_id": "gmwrz0mry02m",
+      "gesture": "Forward",
+      "mode": "hand",
+      "code": "0x30",
+      "command": "NUDGE_FWD",
+      "hold_ms": 600,
+      "min_confidence": 0.60,
+      "action": "Tilt forward a few degrees for a short step, then re-level.",
+      "needs": "attitude control working; real flight tuning",
+      "phase": 2
+    },
+    {
+      "gesture_id": "gmwrz0xxs6c7",
+      "gesture": "Back",
+      "mode": "hand",
+      "code": "0x31",
+      "command": "NUDGE_BACK",
+      "hold_ms": 600,
+      "min_confidence": 0.60,
+      "action": "Tilt back a few degrees for a short step, then re-level.",
+      "needs": "attitude control working; real flight tuning",
+      "phase": 2
+    },
+    {
+      "gesture_id": "gmwrz1esxa3z",
+      "gesture": "360 turn once",
+      "mode": "hand",
+      "code": "0x40",
+      "command": "YAW_360",
+      "hold_ms": 800,
+      "min_confidence": 0.60,
+      "action": "One full turn on the spot, then hold.",
+      "needs": "yaw control (not modelled yet)",
+      "phase": 3
+    },
+    {
+      "gesture_id": "gmwrz21hm7k3",
+      "gesture": "Follow me",
+      "mode": "hand",
+      "code": "0x50",
+      "command": "FOLLOW_ON",
+      "hold_ms": 800,
+      "min_confidence": 0.60,
+      "action": "Aim the laser at the person and keep 0.30 m away.",
+      "params": {"distance_m": 0.30},
+      "needs": "yaw control and a way to see the person's position",
+      "phase": 3
+    },
+    {
+      "gesture_id": "gmwrz3af089x",
+      "gesture": "stop following",
+      "mode": "hand",
+      "code": "0x51",
+      "command": "FOLLOW_OFF",
+      "hold_ms": 400,
+      "min_confidence": 0.60,
+      "action": "Stop following and hold position and height.",
+      "needs": "none beyond hover",
+      "phase": 3
+    }
+  ]
+}
