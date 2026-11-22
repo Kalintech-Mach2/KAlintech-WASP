@@ -6,3 +6,5 @@ slprj/
 secrets.*
 *.env
 wasp-gestures*.json
+__pycache__/
+*.pyc
