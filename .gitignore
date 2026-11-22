@@ -5,3 +5,4 @@ slprj/
 *.autosave
 secrets.*
 *.env
+wasp-gestures*.json

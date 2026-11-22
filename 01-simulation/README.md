@@ -21,3 +21,17 @@ at 1 m using hover thrust (m*g) plus three terms:
 ### Next
 
 Rebuild it in Simulink, then add motor lag (real motors are not instant) and a tilt axis.
+
+## Physics model (Python and MATLAB)
+
+Run `python3 wasp_sim.py` (altitude) or `python3 wasp_attitude.py` (roll and pitch). The `.m` files are
+line-for-line MATLAB versions (R2018b or newer) and give the same plots.
+
+- `wasp_sim`: weight budget, motor and propeller model, altitude controller and step tests.
+  Result: 164.9 g (189.6 g with contingency), thrust-to-weight 3.3 to 5.6, hover about 4.2 min,
+  a 1 m step settles inside +-2 cm in about 1.4 to 1.6 s with a laser sensor, a barometer alone cannot.
+- `wasp_attitude`: roll and pitch with four tests (nominal, battery off-centre, and so on).
+  Lesson: keep the centre of gravity within 5 mm. 20 mm off-centre starts at 48 degrees of tilt.
+
+Weakest assumptions, to be replaced with measurements: the thrust coefficient (thrust stand),
+the moment of inertia (Fusion 360, Inspect, then Properties) and the accelerometer seeing tilt.
