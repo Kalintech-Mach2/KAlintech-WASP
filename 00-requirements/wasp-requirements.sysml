@@ -1,26 +1,29 @@
-// WASP Phase 1 requirements, written in SysML v2 textual notation.
+// WASP requirements, written in SysML v2 textual notation.
 // Lines starting with // are comments.
-// Updated 22 Nov 2026: matches the real parts list and the physics model, adds R10 (centre of gravity)
-// and R11 (gesture confidence).
+// Updated 22 Nov 2026: design changed from a 165 g brushless quad to a ~50 g brushed micro quad
+// (1S, ESP32-S3, 8520 coreless motors). See docs/decisions/0001-micro-brushed-airframe.md.
+// Numbers marked "estimate" come from wasp_budget.py and must be replaced by bench measurements.
 
 package WASP {
 
     // ---------- PART 1: requirements ----------
 
     requirement <R1> totalMass {
-        doc /* Total mass shall not exceed 250 g. Design target 165 g, with contingency up to 190 g. */
-        // Model: budget 164.9 g, 189.6 g with 15% contingency. Margin to limit: about 60 g.
-        // Under 250 g with no camera, a UK Operator ID is optional (a Flyer ID is still required from 100 g).
+        doc /* Total mass shall not exceed 100 g. Design target 52 g, up to 60 g with 15% contingency. */
+        // Estimate: 51.6 g budget, 59.3 g with contingency, margin about 40 g.
+        // Under 100 g no UK Flyer ID or Operator ID is needed (the Drone Code still applies).
     }
 
     requirement <R2> thrustToWeight {
-        doc /* Thrust-to-weight ratio shall be at least 3:1. */
-        // Model: 3.3 (pessimistic) to 5.6 (optimistic), 4.9 expected. Confirm on thrust stand.
+        doc /* Thrust-to-weight ratio shall be at least 2:1. */
+        // Estimate: 1.55 (20 g per motor) to 2.33 (30 g per motor), 1.94 expected. THE MAIN RISK.
+        // Hover throttle about 66 to 80 percent, so there is little spare thrust. Measure on the kitchen scale.
+        // If it fails: 260 mAh battery (saves about 4 g) or smaller props, or lighter frame.
     }
 
     requirement <R3> hoverEndurance {
-        doc /* Hover endurance shall be at least 4 minutes. */
-        // Model: 3.9 to 4.9 min. Borderline at the high-thrust end, so verify by test.
+        doc /* Hover endurance shall be at least 3 minutes. */
+        // Estimate: 4.5 to 7.5 min on a 450 mAh pack (80 percent usable).
     }
 
     requirement <R4> gestureToCommand {
@@ -29,41 +32,42 @@ package WASP {
     }
 
     requirement <R5> failsafe {
-        doc /* Motors shall disarm within 0.5 s of losing the command signal. */
+        doc /* If the heartbeat stops the drone shall hold level and altitude after 0.3 s, descend at 0.2 m/s
+               after 1.0 s, and switch the motors off after 3.0 s or on touchdown. */
+        // Replaces the old "disarm within 0.5 s" rule. WiFi gaps of 100 to 400 ms are normal on an ESP32,
+        // so cutting the motors at 0.5 s would drop the drone out of the air on a hiccup.
+        // Tested in wasp_link.py (simulated drone) and test_link.py.
     }
 
     requirement <R6> noCamera {
         doc /* The drone shall carry no camera. */
-        // Check with the CAA before adding any optical-flow or depth sensor.
+        // The CAA does not define "camera"; an optical-flow sensor is probably not one, but it is not confirmed.
     }
 
     requirement <R7> altitudeStep {
-        doc /* From rest on the ground, a 1 m altitude command shall be reached and held
-               within +-2 cm (0.02 m) with no overshoot above +-2 cm. */
-        // Model: 0.8 s to 90% of target, settles inside +-2 cm in about 1.4 to 1.6 s,
-        // 100% of 300 randomised runs hold +-2 cm. Needs a laser ranging sensor (see R9).
-        // Physical limit for 0 to 1 m and stop is 0.51 s, so this is not the limit.
+        doc /* From rest on the ground, the 0.5 m take-off command shall be reached and held within +-3 cm,
+               and the 0.10 m hover command held within +-3 cm. */
+        // Target only. Needs the distance sensor (R9) and a re-run of the model with measured thrust.
+        // Ground effect below one prop diameter (65 mm) makes 0.10 m harder than 0.5 m.
     }
 
     requirement <R8> currentLimits {
-        doc /* Total battery current shall not exceed 48.75 A (75C x 0.65 Ah),
-               and each motor shall not exceed 18 A. */
-        // Model: 14.8 to 32.6 A total at full throttle, under 9 A per motor.
-        // Still cap maximum throttle in firmware as a safety margin.
+        doc /* Battery current shall not exceed 13.5 A (450 mAh at 30C). Each motor shall stay under 3 A in flight,
+               and each motor switch shall be rated for more than the stalled-motor current. */
+        // 8520: about 1.6 to 1.8 A at full load, stall above 5 A. Total about 7 A.
+        // Use AO3400A (5.7 A) not SI2302 (about 2.6 to 2.9 A) so a jammed prop does not kill the switch.
     }
 
     requirement <R9> altitudeSensing {
-        doc /* The altitude measurement shall have noise of 1 cm or better (1 sigma) at 50 Hz or faster,
-               because a barometer alone cannot meet R7. */
-        // Model: barometer-only holds about +-10 to 25 cm. Laser ToF holds +-2 cm.
+        doc /* The altitude measurement shall have noise of 1 cm or better (1 sigma) at 25 Hz or faster. */
+        // VL53L1X, short mode, up to 50 Hz, minimum range 4 cm. A barometer is useless at 10 cm.
     }
 
     requirement <R10> centreOfGravity {
-        doc /* The centre of gravity shall lie within 5 mm (horizontally) of the geometric centre of the four motors. */
-        // Model (wasp_attitude): a battery 20 mm off-centre starts the drone at about 48 degrees of tilt,
-        // and 40 mm leaves it at about 160 degrees and out of control authority.
-        // Off-centre mass makes the opposite motors run unequal and one hits 0% throttle.
-        // Enclose the battery so it cannot slide.
+        doc /* The centre of gravity shall lie within 3 mm (horizontally) of the geometric centre of the four motors. */
+        // 70 mm motor spacing: 3 mm off means the front and back motor pairs differ by about 9 percent
+        // of thrust just to hover level, and 10 mm means 29 percent, which uses up most of the spare thrust.
+        // Hold the battery in a printed cradle so it cannot slide.
     }
 
     requirement <R11> gestureConfidence {
@@ -72,8 +76,20 @@ package WASP {
                (kill 0.3 s, takeoff 0.8 s, others 0.4 to 0.8 s). Body gestures override hand gestures,
                and kill overrides everything. */
         // Test data: 9 gestures, zero wrong-gesture triggers across all tolerance settings,
-        // and 10 s of body idle never came near kill or hover. Hand idle still to be recorded.
+        // and body idle never came near kill or hover. Hand idle not recorded.
         // Values live in 04-tracker/gesture-studio/wasp-command-table.json.
+    }
+
+    requirement <R12> killLatency {
+        doc /* KILL shall switch all motors off within 50 ms of the drone receiving it, handled in the
+               receive routine and not in the control loop. */
+        // The laptop sends KILL five times. Use ESP-NOW for the link if WiFi jitter makes this unreliable.
+    }
+
+    requirement <R13> armInterlock {
+        doc /* The drone shall only arm when the heartbeat is present, the motors are idle, the drone is level
+               (within 10 degrees) and the battery is at least 3.7 V. Take-off shall only be accepted when armed. */
+        // Heartbeat, mode and take-off rules are tested in the simulated drone. Level and battery checks need the real hardware.
     }
 
 
@@ -84,35 +100,32 @@ package WASP {
 
     part wasp : Drone {
         part flightController;   // ESP32-S3 SuperMini
-        part imu;                // MPU-6050 (GY-521), I2C address 0x68
-        part altitudeSensor;     // laser ToF (VL53L1X class), I2C address 0x29. NOT BOUGHT YET.
-        part esc;                // JHEMCU EM40A 4-in-1, DShot, Bluejay firmware
-        part motors;             // 4x YSIDO 1505 3750KV, 11 g each
-        part propellers;         // 4x Gemfan 3016, 3-inch, 3-blade, 1.5 mm shaft, M2 screws
-        part battery;            // Tattu 650 mAh 3S 75C, XT30, 59 g
-        part buckRegulator;      // 5 V supply for the flight controller
-        part frame;              // design target 22 g
+        part imu;                // MPU-6050 (GY-521)
+        part altitudeSensor;     // VL53L1X
+        part motorDrivers;       // 4x AO3400A MOSFET + 4x SS14 diode
+        part motors;             // 4x 8520 coreless brushed
+        part propellers;         // 4x 65 mm
+        part battery;            // 1S 450 mAh LiHV
+        part frame;              // 3D printed, with battery cradle
     }
 
-    // The separate unit that watches your hand and body and sends commands.
-    part tracker : Tracker;      // laptop webcam first (Gesture Studio and Gesture Link), Pi Zero 2 W later
+    // The separate unit that watches your hand and sends commands.
+    part tracker : Tracker;      // laptop webcam, wasp_link.py relay, optional ESP-NOW USB dongle
 
 
     // ---------- PART 3: which part satisfies which requirement ----------
 
     satisfy R1 by wasp;
-    satisfy R2 by wasp.motors;            // propellers matter too, see note below
+    satisfy R2 by wasp.motors;            // propellers, battery mass and frame mass matter too
     satisfy R3 by wasp.battery;
     satisfy R4 by tracker;
     satisfy R5 by wasp.flightController;
     satisfy R6 by wasp;
     satisfy R7 by wasp.flightController;  // the controller, using the altitude sensor and IMU
-    satisfy R8 by wasp.esc;               // throttle cap lives in the flight controller too
+    satisfy R8 by wasp.motorDrivers;
     satisfy R9 by wasp.altitudeSensor;
-    satisfy R10 by wasp.frame;            // frame design and battery mounting
+    satisfy R10 by wasp.frame;            // frame design and battery cradle
     satisfy R11 by tracker;
-
-    // Note: real requirements often have more than one part involved.
-    // R2 depends on motors AND propellers, and R3 depends on the battery AND the weight.
-    // Later we can split these into separate lines to show that.
+    satisfy R12 by wasp.flightController;
+    satisfy R13 by wasp.flightController;
 }

@@ -1,8 +1,8 @@
 {
  "tool": "WASP command table",
- "version": 3,
+ "version": 4,
  "source_export": "wasp-gestures-20261122-1513.json",
- "frame_format": "Each command is sent as two bytes: [code, code XOR 0xFF]. The drone rejects any frame where the second byte is not the inverse of the first. Heartbeat (0x01) is sent at 10 Hz. If the drone hears no heartbeat for 0.5 s while armed or flying, it cuts the motors (requirement R5). It does not try to land itself.",
+ "frame_format": "Each command is sent as two bytes: [code, code XOR 0xFF]. The drone rejects any frame where the second byte is not the inverse of the first. Heartbeat (0x01) is sent at 10 Hz. If the heartbeat stops the drone holds level and altitude after 0.3 s, descends at 0.2 m/s after 1.0 s, and switches the motors off after 3.0 s or on touchdown (requirement R5). KILL is the only instant stop. Planned for the real firmware: a sequence byte so repeated frames can be ignored.",
  "rules": [
   "A command is only sent if the smoothed match is for that gesture AND its confidence is at or above that command's min_confidence for the whole hold time.",
   "Body gestures override hand gestures. KILL overrides everything and is sent as a burst of 5 identical frames.",
@@ -152,5 +152,13 @@
    "command": "DISARM",
    "note": "button or A key; also resets after KILL or FAILSAFE"
   }
- ]
+ ],
+ "failsafe": {
+  "hold_after_s": 0.3,
+  "descend_after_s": 1.0,
+  "motors_off_after_s": 3.0,
+  "descent_rate_m_s": 0.2,
+  "link_back": "short drop returns to hover; once descent has started the drone finishes landing",
+  "arm_needs": "heartbeat present, motors idle, level within 10 degrees, battery 3.7 V or more"
+ }
 }

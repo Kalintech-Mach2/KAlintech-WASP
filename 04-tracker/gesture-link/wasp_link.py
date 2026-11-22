@@ -13,8 +13,11 @@ and optionally forwards it over UDP.
 Safety rules the simulator enforces (mirrors requirements R5/R8):
   * Frames whose second byte is not the inverse of the first are rejected.
   * ARM only from DISARMED, on the ground.  TAKEOFF only when ARMED.
-  * Heartbeat (0x01) expected at 10 Hz.  No heartbeat for 0.5 s while armed or
-    airborne -> FAILSAFE: motors off (it does NOT try to land itself).
+  * Heartbeat (0x01) expected at 10 Hz.  Layered failsafe when it stops (requirement R5):
+      > 0.3 s  LINK_HOLD     keep level and hold altitude
+      > 1.0 s  LINK_DESCENT  descend slowly (0.2 m/s), disarm on touchdown
+      > 3.0 s  FAILSAFE      motors off
+    A returning heartbeat ends LINK_HOLD; once descent has started the drone lands.
   * KILL (0xE0) works in any state: motors off immediately.
   * After landing the drone disarms itself.
 """
@@ -29,7 +32,12 @@ CODES = {
     0x30: "NUDGE_FWD", 0x31: "NUDGE_BACK", 0x40: "YAW_360",
     0x50: "FOLLOW_ON", 0x51: "FOLLOW_OFF", 0xE0: "KILL",
 }
-HEARTBEAT_TIMEOUT = 0.5   # s
+HOLD_AFTER = 0.3          # s without heartbeat -> hold
+DESCEND_AFTER = 1.0       # s -> descend
+OFF_AFTER = 3.0           # s -> motors off
+DESCENT_RATE = 0.2        # m/s
+HEARTBEAT_TIMEOUT = HOLD_AFTER   # "link ok" in the UI means younger than this
+FLYING = ("TAKEOFF", "HOVER", "LANDING", "LINK_HOLD", "LINK_DESCENT")
 TAKEOFF_ALT = 0.5         # m
 LOW_ALT = 0.10            # m
 NUDGE_STEP = 0.15         # m
@@ -59,6 +67,7 @@ class Drone:
             self.following = False
             self.motors = False
             self.last_hb = None          # time of last heartbeat, None = never heard
+            self.prev_mode = None        # mode to return to after a short link drop
             self.hb_count = 0; self.frame_count = 0; self.bad_count = 0
             self.log = []
             self.crashed = False
@@ -73,7 +82,7 @@ class Drone:
 
     @property
     def airborne(self):
-        return self.mode in ("TAKEOFF", "HOVER", "LANDING") and self.z > 0.02
+        return self.mode in FLYING and self.z > 0.02
 
     def _motors_off(self, mode):
         self.mode = mode; self.motors = False
@@ -118,7 +127,7 @@ class Drone:
             if m != "ARMED": return False, "not armed"
             self.mode = "TAKEOFF"; self.motors = True; self.zt = TAKEOFF_ALT; return True, ""
         if name == "LAND":
-            if m not in ("TAKEOFF", "HOVER"): return False, "not airborne"
+            if m not in ("TAKEOFF", "HOVER", "LINK_HOLD", "LINK_DESCENT"): return False, "not airborne"
             self.mode = "LANDING"; self.yaw_left = 0.0; self.following = False; return True, ""
         if m not in ("HOVER", "TAKEOFF"):
             return False, "not airborne"
@@ -139,17 +148,33 @@ class Drone:
     def step(self, dt):
         with self.lock:
             now = self.clock()
-            # heartbeat failsafe (R5): motors off, not "land"
-            if (self.mode in ("ARMED", "TAKEOFF", "HOVER", "LANDING") and self.last_hb is not None
-                    and now - self.last_hb > HEARTBEAT_TIMEOUT):
-                if self.z > 0.02:
-                    self._motors_off("FAILSAFE")
-                    self._note("HEARTBEAT LOST -> motors off")
-                else:
-                    self.mode = "DISARMED"; self.motors = False
-                    self._note("HEARTBEAT LOST -> disarmed")
-            if self.motors and self.mode in ("TAKEOFF", "HOVER", "LANDING"):
-                if self.mode == "LANDING":
+            # layered heartbeat failsafe (R5)
+            if self.last_hb is not None and (self.mode in FLYING or self.mode == "ARMED"):
+                gap = now - self.last_hb
+                if self.mode == "ARMED":
+                    if gap > DESCEND_AFTER:
+                        self.mode = "DISARMED"; self._note("HEARTBEAT LOST on ground -> disarmed")
+                elif gap > OFF_AFTER:
+                    if self.z > 0.02:
+                        self._motors_off("FAILSAFE"); self._note("HEARTBEAT LOST %.0fs -> motors off" % OFF_AFTER)
+                    else:
+                        self.mode = "DISARMED"; self.motors = False
+                elif gap > DESCEND_AFTER:
+                    if self.mode in ("TAKEOFF", "HOVER", "LINK_HOLD"):
+                        self.mode = "LINK_DESCENT"; self.yaw_left = 0.0; self.following = False
+                        self._note("HEARTBEAT LOST 1 s -> descending")
+                elif gap > HOLD_AFTER:
+                    if self.mode in ("TAKEOFF", "HOVER"):
+                        self.prev_mode = self.mode; self.mode = "LINK_HOLD"
+                        self.following = False; self._note("HEARTBEAT LOST 0.3 s -> holding")
+                elif self.mode == "LINK_HOLD":      # link is back
+                    self.mode = self.prev_mode or "HOVER"; self._note("link back, resuming")
+                elif self.mode == "LINK_DESCENT":   # descent already started: finish the landing
+                    self.mode = "LANDING"; self._note("link back, landing")
+            if self.motors and self.mode in FLYING:
+                if self.mode == "LINK_DESCENT":
+                    vcmd = -DESCENT_RATE
+                elif self.mode == "LANDING":
                     self.zt = max(0.0, self.z - LAND_RATE * dt * 3) if self.z > 0.05 else 0.0
                     vcmd = -LAND_RATE
                 else:
@@ -162,7 +187,7 @@ class Drone:
                     self.yaw = (self.yaw + d) % 360.0; self.yaw_left -= d
                 if self.mode == "TAKEOFF" and abs(self.z - self.zt) < 0.03 and abs(self.vz) < 0.1:
                     self.mode = "HOVER"
-                if self.mode == "LANDING" and self.z <= 0.02:
+                if self.mode in ("LANDING", "LINK_DESCENT") and self.z <= 0.02:
                     self.z = 0.0; self.vz = 0.0; self.motors = False
                     self.mode = "DISARMED"; self.xt = self.x
                     self._note("landed, disarmed")

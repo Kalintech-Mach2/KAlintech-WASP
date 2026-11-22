@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copy the newest downloaded WASP files into this repo, commit and push.   (v2)
+# Copy the newest downloaded WASP files into this repo, commit and push.   (v3)
 #   tools/wasp-sync.sh "message"
 #   NO_PUSH=1 tools/wasp-sync.sh        commit only
 #   WASP_DOWNLOADS=/path                if you do not download to ~/Downloads
@@ -24,6 +24,7 @@ grab 'wasp-link*.html'           04-tracker/gesture-link/index.html             
 grab 'wasp_link*.py'             04-tracker/gesture-link/wasp_link.py              'WASP Gesture Link - relay'
 grab 'wasp_link_test*.py'        04-tracker/gesture-link/test_link.py              'import wasp_link'
 grab 'wasp-requirements*.sysml'  00-requirements/wasp-requirements.sysml           'package WASP'
+grab 'wasp_budget*.py'           01-simulation/wasp_budget.py                      'WASP micro (1S brushed)'
 grab 'wasp_sim*.py'              01-simulation/wasp_sim.py                         'physics model and altitude step test'
 grab 'wasp_sim*.m'               01-simulation/wasp_sim.m                          'physics model and altitude step test'
 grab 'wasp_attitude*.py'         01-simulation/wasp_attitude.py                    'attitude (roll and pitch) model'

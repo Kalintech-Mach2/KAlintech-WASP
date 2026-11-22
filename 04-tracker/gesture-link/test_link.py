@@ -62,16 +62,32 @@ class T(unittest.TestCase):
         self.assertEqual(self.d.frame(fr(3))[2], "ok"); self.assertEqual(self.d.mode, "DISARMED")
     def test_kill_works_anywhere(self):
         self.assertEqual(self.d.frame(fr(0xE0))[2], "ok"); self.assertEqual(self.d.mode, "KILLED")
-    def test_failsafe_is_motors_off(self):
-        self.fly(); self.run_for(1.0, hb=False)
+    def test_failsafe_stages(self):
+        self.fly(); z0 = self.d.z
+        self.run_for(0.2, hb=False); self.assertEqual(self.d.mode, "HOVER")          # still fine at 0.2 s
+        self.run_for(0.25, hb=False); self.assertEqual(self.d.mode, "LINK_HOLD")     # > 0.3 s
+        self.assertTrue(self.d.motors); self.assertAlmostEqual(self.d.z, z0, delta=0.03)
+        self.run_for(0.8, hb=False); self.assertEqual(self.d.mode, "LINK_DESCENT")   # > 1.0 s
+        z1 = self.d.z; self.run_for(0.5, hb=False); self.assertLess(self.d.z, z1 - 0.05)
+        self.assertGreater(self.d.z, 0.0)
+        self.run_for(1.6, hb=False)                                                  # > 3.0 s
         self.assertEqual(self.d.mode, "FAILSAFE"); self.assertFalse(self.d.motors)
-        self.assertEqual(self.d.z, 0)  # fell
+    def test_short_dropout_recovers(self):
+        self.fly(); self.run_for(0.6, hb=False); self.assertEqual(self.d.mode, "LINK_HOLD")
+        self.run_for(0.3); self.assertEqual(self.d.mode, "HOVER"); self.assertTrue(self.d.motors)
+    def test_descent_then_link_back_lands(self):
+        self.fly(); self.run_for(1.3, hb=False); self.assertEqual(self.d.mode, "LINK_DESCENT")
+        self.run_for(0.3); self.assertEqual(self.d.mode, "LANDING"); self.run_for(4)
+        self.assertEqual(self.d.mode, "DISARMED"); self.assertFalse(self.d.crashed)
     def test_failsafe_timing(self):
         self.fly(); t = 0
         while self.d.mode == "HOVER" and t < 2: self.run_for(0.01, hb=False); t += 0.01
-        self.assertAlmostEqual(t, 0.5, delta=0.12)
+        self.assertAlmostEqual(t, 0.3, delta=0.12)
     def test_grounded_armed_hb_loss_disarms(self):
-        self.arm(); self.run_for(1.0, hb=False); self.assertEqual(self.d.mode, "DISARMED")
+        self.arm(); self.run_for(1.3, hb=False); self.assertEqual(self.d.mode, "DISARMED")
+    def test_kill_in_link_hold(self):
+        self.fly(); self.run_for(0.6, hb=False); self.d.frame(fr(1)); self.assertEqual(self.d.frame(fr(0xE0))[2], "ok")
+        self.assertEqual(self.d.mode, "KILLED"); self.assertFalse(self.d.motors)
     def test_disarm_blocked_airborne(self):
         self.fly(); self.assertIn("airborne", self.d.frame(fr(3))[2])
     def test_double_takeoff_ignored(self):

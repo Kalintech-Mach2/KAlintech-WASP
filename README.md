@@ -1,10 +1,10 @@
 # WASP
 
-**W**ave-**A**ctivated **S**ub-250g **P**latform
+**W**ave-**A**ctivated **S**ub-100g **P**latform
 
 *Unofficial expansions, depending on the day: Wildly Ambitious Student Project. We Asked Simulink Politely.*
 
-A tiny quadcopter you fly by waving at it. It weighs about 165 grams (our limit is 250), has no camera on
+A tiny quadcopter you fly by waving at it. It weighs about 50 grams (our limit is 100), has no camera on
 board, and gets its orders from a separate hand tracker that does all the watching. A KAlintech
 project by Nick, Kalis and Ajmal.
 
@@ -19,7 +19,7 @@ Your hand -> webcam -> laptop (hand and body tracking; Pi Zero 2 W later)
                                  |
                                  | Wi-Fi (UDP commands)
                                  v
-  3S LiPo --> 4-in-1 ESC --> 4 brushless motors
+  1S LiPo --> 4 MOSFET motor drivers --> 4 brushless motors
      |            ^ DShot
      +--> 5 V regulator --> ESP32-S3 flight controller <-- IMU
 ```
@@ -33,10 +33,10 @@ The hard part is the bit in between.
 
 | Stage | Status |
 |---|---|
-| Requirements and SysML model | done: 11 requirements in `00-requirements/` |
-| Simulation (MATLAB and Python) | done for altitude and roll/pitch, Simulink rebuild next |
+| Requirements and SysML model | done: 13 requirements in `00-requirements/` |
+| Simulation (MATLAB and Python) | 165 g study done and archived, micro budget done, Simulink rebuild next |
 | CAD (Fusion 360) | not started |
-| Gesture tracker (laptop prototype) | Gesture Studio built, 9 gestures recorded, Gesture Link next |
+| Gesture tracker (laptop prototype) | Gesture Studio and Gesture Link built, tested against a simulated drone |
 | Hardware bring-up | not started |
 | First flight | not started (we would like this one to go well) |
 
@@ -62,17 +62,17 @@ including the parts where we were wrong.
 
 | Part | Choice |
 |---|---|
-| Motors | 4x YSIDO 1505 3750KV brushless |
-| Propellers | Gemfan 3016, 3-inch 3-blade, 1.5 mm hole |
-| ESC | JHEMCU EM40A 4-in-1, DShot, 20x20 mm, no built-in 5 V output |
+| Motors | 4x 8520 coreless brushed |
+| Propellers | 65 mm, 1 mm bore |
+| Motor drivers | 4x AO3400A MOSFET + SS14 diode (no ESC) |
 | Flight controller | ESP32-S3 SuperMini |
 | IMU | MPU-6050 (GY-521) |
 | Altitude sensor | VL53L1X laser time-of-flight (planned) |
-| Battery | 3S LiPo, 650 mAh, 75C, XT30 (59 g) |
+| Battery | 1S LiHV, 450 mAh, 30C, BT2.0 plug (about 11 g) |
 | Power for the ESP32 | 5 V buck regulator off the battery |
 | Tracker | Raspberry Pi Zero 2 W and OV5647 camera (laptop webcam first) |
 
-Targets: total mass under 250 g (the model says about 165 g) and a drone parts budget of about 105 GBP.
+Targets: total mass under 100 g (the budget says about 52 g) and a drone parts budget under 100 GBP.
 
 ## Repo layout
 
@@ -83,6 +83,7 @@ Targets: total mass under 250 g (the model says about 165 g) and a drone parts b
 - `04-tracker/` gesture tracker code
 - `docs/build-log/` dated notes
 - `tools/` helper scripts, including `wasp-sync.sh`
+- `docs/decisions/` why each big design choice was made
 
 ## Safety (the serious bit)
 

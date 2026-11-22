@@ -76,6 +76,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .badge{display:inline-block;padding:3px 12px;border-radius:99px;font-weight:700;letter-spacing:.5px;font-size:12.5px;background:#2a313b;color:var(--muted)}
 .badge.ARMED{background:rgba(255,184,0,.18);color:var(--accent)}
 .badge.TAKEOFF,.badge.HOVER,.badge.LANDING{background:rgba(61,220,151,.16);color:var(--good)}
+.badge.LINK_HOLD,.badge.LINK_DESCENT{background:rgba(255,184,0,.22);color:#ffd36b;animation:pulse 1s infinite}
 .badge.KILLED,.badge.FAILSAFE{background:rgba(255,93,93,.18);color:#ff8a8a}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
 .m{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px}
@@ -170,7 +171,7 @@ kbd{background:var(--surface2);border:1px solid var(--border2);border-bottom-wid
           <button class="btn" id="armBtn" disabled>ARM</button>
           <button class="btn kill" id="killBtn">KILL (motors off)</button>
         </div>
-        <p class="hint" style="margin:12px 0 0"><kbd>A</kbd> arm / disarm &nbsp; <kbd>K</kbd> <kbd>Esc</kbd> <kbd>Space</kbd> kill. Take off only works once armed. Follow, turn and nudge only work in flight. Losing the link for 0.5 s cuts the motors.</p>
+        <p class="hint" style="margin:12px 0 0"><kbd>A</kbd> arm / disarm &nbsp; <kbd>K</kbd> <kbd>Esc</kbd> <kbd>Space</kbd> kill. Take off only works once armed. Follow, turn and nudge only work in flight. If the link drops: hold after 0.3 s, descend after 1 s, motors off after 3 s.</p>
       </div>
     </div>
     <div class="card">
@@ -497,6 +498,7 @@ function setDrone(s){
   const m=$('#mode'); m.textContent=s.mode; m.className='badge '+s.mode;
   $('#vZ').textContent=s.z.toFixed(2)+' m'; $('#vX').textContent=s.x.toFixed(2)+' m'; $('#vYaw').textContent=Math.round(s.yaw)+'°';
   $('#vHb').textContent=s.hb_age==null?'–':(s.link_ok?'OK':'LOST'); $('#vHb').style.color=s.link_ok?'':'#ff8a8a';
+  if(s.mode==='LINK_HOLD'||s.mode==='LINK_DESCENT') flash('LINK LOST · '+(s.mode==='LINK_HOLD'?'holding':'descending'),'bad');
   const b=$('#banner');
   if(s.udp){b.textContent='LIVE LINK: frames are also being sent to the real drone at '+s.udp+'. Props off for testing!';b.classList.add('live');}
   else{b.textContent='Simulation: no real drone is connected. Frames go to the simulated drone only.';b.classList.remove('live');}
@@ -506,7 +508,7 @@ function setDrone(s){
 }
 function updateButtons(){
   const a=$('#armBtn'), m=drone.mode;
-  const flying=['TAKEOFF','HOVER','LANDING'].includes(m);
+  const flying=['TAKEOFF','HOVER','LANDING','LINK_HOLD','LINK_DESCENT'].includes(m);
   a.textContent=m==='DISARMED'?'ARM':m==='ARMED'?'DISARM':(m==='KILLED'||m==='FAILSAFE')?'RESET':'ARM';
   a.disabled=!relayOK||flying||(m==='DISARMED'&&!running);
   a.classList.toggle('primary',m==='DISARMED'&&!a.disabled);

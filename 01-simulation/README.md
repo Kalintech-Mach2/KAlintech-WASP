@@ -35,3 +35,7 @@ line-for-line MATLAB versions (R2018b or newer) and give the same plots.
 
 Weakest assumptions, to be replaced with measurements: the thrust coefficient (thrust stand),
 the moment of inertia (Fusion 360, Inspect, then Properties) and the accelerometer seeing tilt.
+
+## Archived: 165 g brushless study (22 Nov 2026)
+
+`wasp_sim.py/.m` and `wasp_attitude.py/.m` model the first design (3S, 1505 motors, 165 g). We changed to a 50 g brushed micro quad, see `docs/decisions/0001-micro-brushed-airframe.md`. The method carries over; the numbers do not. `wasp_budget.py` is the weight, thrust and centre-of-gravity budget for the micro design. The next model uses measured thrust from the bench test.
